@@ -2,3 +2,5 @@ All code was run using R-3.4.3 on Ubuntu 16.04.
 
 Details on software versions of additional R packages see corresponding R output HTML files. 
 
+Instructions on how R scripts were run to produce the figures can be found in file README_FIGURE_MAPPING
+
