@@ -1,0 +1,92 @@
+---
+title: "Microarray Data Axin+ vs. Axin- in colon - DGE Reanalysis with LIMMA"
+author: "Hilmar Berger"
+output: 
+ html_document:
+    toc: true
+    toc_depth: 3
+    toc_float: false
+    number_sections: true
+    code_folding: hide
+    
+pdf_document:
+    fig_caption: true
+date: "`r format(Sys.time(), '%d %B, %Y %H:%M:%S')`"
+---
+
+```{r, echo=FALSE, results='hide', message=FALSE}
+rm(list=ls())
+suppressMessages(library(limma))
+suppressMessages(library(xlsx))
+suppressMessages(library(pheatmap))
+library(data.table)
+library(xtable)
+library(reshape2)
+
+load("../../Data/Processed/Axin_Colon_micro_array_preprocessed_data.Rdata")
+ed$Cy3_group = ed$Cy3
+ed$Cy5_group = ed$Cy5
+
+result_folder = "../../Results/Axin"
+if (!file.exists(result_folder)) dir.create(result_folder, recursive=T)
+```
+
+# Introduction
+
+This is data from a mouse experiment (Axin2+ vs. Axin2- cells) hybridized as dual channel to Agilent 014568 micro array. 
+
+# Diffential gene expression
+
+```{r}
+all_results = list()
+```
+
+```{r}
+controls = MA$genes$ControlType!=0
+
+MA.avg <- avereps(MA[!controls,], ID=MA[!controls,]$genes$ProbeName)
+
+sel_arrays = rownames(ed)
+data = MA.avg[, sel_arrays]
+design = ifelse(ed$Cy5 == "Axin+", 1, -1)
+
+fit = lmFit(data, design = design)
+fit <- eBayes(fit)
+
+all_results[["Axin_p_vs_Axin_m"]] = topTable(fit, adjust="BH",number=nrow(fit))
+```
+
+
+```{r, volcano, echo=FALSE, fig.width=8, fig.height=8}
+all_target_conditions = names(all_results)
+par(mfrow=c(1,1), mar=c(5,4,4,2))
+
+for (tc in all_target_conditions) {
+  r = all_results[[tc]]
+  plot(r$logFC, -log10(r$adj.P.Val),xlab="log2 Fold Change",ylab="-log10(adj. p-val)", ylim=c(0,max(2,max(-log10(r$adj.P.Val),na.rm=T))))
+  title(main=tc, sub=paste("(",nrow(subset(r, adj.P.Val < 0.05))," signif. DE genes)",sep="") )
+  abline(h=-log10(0.05),col="red")
+  abline(v=c(-1,1))
+}
+```
+
+```{r, write_tabs, echo=FALSE}
+output_file_prefix = paste(result_folder,"Differential_expression_results_", sep="/")
+selected_cols = c("ProbeName", "GeneSymbol", "GeneName","EntrezID","logFC","AveExpr","t","P.Value","adj.P.Val","GencodeM12MappingStatus","GeneSymbol_Gencode","Transcript_Type" )
+for (tc in all_target_conditions) {
+  write.table(all_results[[tc]][,selected_cols], file=paste(output_file_prefix, tc, ".txt", sep="" ), row.names=F , sep="\t", dec=".")
+}
+```
+
+
+```{r}
+filename = paste(result_folder,"DGE_results_Axin.Rdata",sep="/")
+exp_design = ed
+save(all_results, exp_design, file=filename)
+```
+
+
+# Session Info
+```{r}
+sessionInfo()
+```
